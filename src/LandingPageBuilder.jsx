@@ -937,7 +937,7 @@ export default function LandingPageBuilder() {
               ) : (
                 <>
                   <textarea value={source} onChange={(e) => setSource(e.target.value)} rows={8}
-                    placeholder={"Wklej notatki, brief, teksty, ceny, terminy…\n\nNp.:\n- Produkt: Angloville Junior Zagranica Malta\n- Wiek: 11-18 lat\n- Termin: 13-27 lipca 2026\n- Cena: od 6 490 zł\n- Co wchodzi: opieka 24/7, 3 posiłki, zakwaterowanie, nauka przez praktykę\n- CTA: „Zapisz dziecko"\n- Sekcje: hero, plan dnia, co wchodzi, cennik, FAQ, formularz"}
+                    placeholder={`Wklej notatki, brief, teksty, ceny, terminy…\n\nNp.:\n- Produkt: Angloville Junior Zagranica Malta\n- Wiek: 11-18 lat\n- Termin: 13-27 lipca 2026\n- Cena: od 6 490 zł\n- Co wchodzi: opieka 24/7, 3 posiłki, zakwaterowanie, nauka przez praktykę\n- CTA: „Zapisz dziecko"\n- Sekcje: hero, plan dnia, co wchodzi, cennik, FAQ, formularz`}
                     style={{ ...S.ta,minHeight:200 }}/>
                   <div style={{ marginTop:8,display:"flex",alignItems:"center",gap:6 }}>
                     <span style={{ fontSize:14 }}>💡</span>
