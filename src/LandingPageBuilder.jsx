@@ -211,7 +211,7 @@ function parseImagesFromHtml(html) {
 ═══════════════════════════════════════════════ */
 const PLACEHOLDER_PRESETS = [
   { match: /hero|banner|header|jumbotron/i, label: "Hero — tło sekcji", w: "1200", h: "675", inject: "bg", desc: "Główny baner / tło hero" },
-  { match: /about|overview|intro|who-we|o-nas/i, label: "Sekcja „O nas" — zdjęcie", w: "600", h: "400", inject: "img", desc: "Zdjęcie do sekcji informacyjnej" },
+  { match: /about|overview|intro|who-we|o-nas/i, label: "Sekcja O nas - zdjecie", w: "600", h: "400", inject: "img", desc: "Zdjecie do sekcji informacyjnej" },
   { match: /feature|benefit|advantage|korzy/i, label: "Ikona / zdjęcie feature", w: "400", h: "400", inject: "img", desc: "Ilustracja do sekcji benefitów" },
   { match: /testimonial|opini|review|quote/i, label: "Zdjęcie autora opinii", w: "80", h: "80", inject: "img", desc: "Avatar / zdjęcie osoby" },
   { match: /cta|call-to-action|action|zapisy|contact/i, label: "CTA — tło sekcji", w: "1200", h: "500", inject: "bg", desc: "Tło sekcji z wezwaniem do akcji" },
@@ -252,7 +252,7 @@ function detectPlaceholders(html) {
 
         slots.push({
           id: idCounter++,
-          label: headingText ? `${preset.label} — „${headingText}"` : preset.label,
+          label: headingText ? `${preset.label} — "${headingText}"` : preset.label,
           desc: preset.desc,
           w: preset.w,
           h: preset.h,
@@ -281,7 +281,7 @@ function detectPlaceholders(html) {
         const headingText = heading ? heading.textContent.trim().substring(0, 40) : "Hero";
         slots.push({
           id: idCounter++,
-          label: `Hero tło — „${headingText}"`,
+          label: `Hero tło — "${headingText}"`,
           desc: "Główny baner strony",
           w: "1200", h: "675",
           inject: "bg",
@@ -595,7 +595,7 @@ function ImageReplacer({ html, onHtmlUpdate }) {
           {images.filter(i => i.type === "img").length > 0 && images.filter(i => i.type !== "img").length > 0 && (
             <span> ({images.filter(i => i.type === "img").length} × <code>&lt;img&gt;</code>, {images.filter(i => i.type !== "img").length} × tło CSS)</span>
           )}
-          . Wklej nowe URLe → kliknij „Generuj HTML z nowymi obrazami".
+          . Wklej nowe URLe → kliknij "Generuj HTML z nowymi obrazami".
         </div>
       )}
 
@@ -1157,13 +1157,13 @@ export default function LandingPageBuilder() {
                     </div>
                   )}
                   {fetchStatus==="idle" && (
-                    <div style={{ fontSize:12,color:"#aaa",padding:"2px 4px" }}>Wpisz URL i kliknij „Pobierz stronę" — backend pobierze HTML automatycznie.</div>
+                    <div style={{ fontSize:12,color:"#aaa",padding:"2px 4px" }}>Wpisz URL i kliknij "Pobierz stronę" — backend pobierze HTML automatycznie.</div>
                   )}
                 </>
               ) : (
                 <>
                   <textarea value={source} onChange={(e) => setSource(e.target.value)} rows={8}
-                    placeholder={`Wklej notatki, brief, teksty, ceny, terminy…\n\nNp.:\n- Produkt: Angloville Junior Zagranica Malta\n- Wiek: 11-18 lat\n- Termin: 13-27 lipca 2026\n- Cena: od 6 490 zł\n- Co wchodzi: opieka 24/7, 3 posiłki, zakwaterowanie, nauka przez praktykę\n- CTA: „Zapisz dziecko"\n- Sekcje: hero, plan dnia, co wchodzi, cennik, FAQ, formularz`}
+                    placeholder={`Wklej notatki, brief, teksty, ceny, terminy…\n\nNp.:\n- Produkt: Angloville Junior Zagranica Malta\n- Wiek: 11-18 lat\n- Termin: 13-27 lipca 2026\n- Cena: od 6 490 zł\n- Co wchodzi: opieka 24/7, 3 posiłki, zakwaterowanie, nauka przez praktykę\n- CTA: "Zapisz dziecko"\n- Sekcje: hero, plan dnia, co wchodzi, cennik, FAQ, formularz`}
                     style={{ ...S.ta,minHeight:200 }}/>
                   <div style={{ marginTop:8,display:"flex",alignItems:"center",gap:6 }}>
                     <span style={{ fontSize:14 }}>💡</span>
