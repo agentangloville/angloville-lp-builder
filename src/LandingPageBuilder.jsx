@@ -142,139 +142,48 @@ function parseImagesFromHtml(html) {
   let match;
   while ((match = imgRegex.exec(html)) !== null) {
     const tag = match[0];
-
-    // Try src first with word boundary to avoid matching data-src
     let srcMatch = tag.match(/(?<![a-zA-Z-])src=["']([^"']+)["']/i);
-    // Fallback: data-src, data-lazy-src, data-original
-    if (!srcMatch) {
-      srcMatch = tag.match(/data-(?:lazy-|original-)?src=["']([^"']+)["']/i);
-    }
+    if (!srcMatch) srcMatch = tag.match(/data-(?:lazy-|original-)?src=["']([^"']+)["']/i);
     if (!srcMatch) continue;
-    // Skip data URIs
     if (srcMatch[1].startsWith("data:")) continue;
 
     const altMatch = tag.match(/alt=["']([^"']*?)["']/i);
-    let w = null,
-      h = null;
+    let w = null, h = null;
 
-    // Context window: between previous <img and this one
     const rawBefore = html.substring(0, match.index);
-    const prevImgIdx = Math.max(
-      rawBefore.lastIndexOf("<img "),
-      rawBefore.lastIndexOf("<img\t"),
-      rawBefore.lastIndexOf("<img\n"),
-      rawBefore.lastIndexOf("<img>")
-    );
-    const windowStart =
-      prevImgIdx >= 0 ? prevImgIdx : Math.max(0, match.index - 500);
+    const prevImgIdx = Math.max(rawBefore.lastIndexOf("<img "), rawBefore.lastIndexOf("<img\t"), rawBefore.lastIndexOf("<img\n"), rawBefore.lastIndexOf("<img>"));
+    const windowStart = prevImgIdx >= 0 ? prevImgIdx : Math.max(0, match.index - 500);
     const before = html.substring(windowStart, match.index);
 
-    // 1. <!-- IMAGE: ... | wymiar: WxHpx --> comment (last match to avoid bleed)
-    const dimMatches = [
-      ...before.matchAll(/wymiar:\s*(\d+)\s*[xX×]\s*(\d+)\s*px/gi),
-    ];
-    const dimComment = dimMatches.length
-      ? dimMatches[dimMatches.length - 1]
-      : null;
-    if (dimComment) {
-      w = dimComment[1];
-      h = dimComment[2];
-    }
+    const dimMatches = [...before.matchAll(/wymiar:\s*(\d+)\s*[xX×]\s*(\d+)\s*px/gi)];
+    const dimComment = dimMatches.length ? dimMatches[dimMatches.length - 1] : null;
+    if (dimComment) { w = dimComment[1]; h = dimComment[2]; }
 
-    // 2. placehold.co URL
-    if (!w || !h) {
-      const phMatch = srcMatch[1].match(
-        /placehold\.co\/(\d+)\s*[xX×]\s*(\d+)/
-      );
-      if (phMatch) {
-        w = w || phMatch[1];
-        h = h || phMatch[2];
-      }
-    }
-
-    // 3. HTML width/height attributes
-    if (!w) {
-      const m = tag.match(/\bwidth=["'](\d+)["']/i);
-      if (m) w = m[1];
-    }
-    if (!h) {
-      const m = tag.match(/\bheight=["'](\d+)["']/i);
-      if (m) h = m[1];
-    }
-
-    // 4. Inline style px values
+    if (!w || !h) { const phMatch = srcMatch[1].match(/placehold\.co\/(\d+)\s*[xX×]\s*(\d+)/); if (phMatch) { w = w || phMatch[1]; h = h || phMatch[2]; } }
+    if (!w) { const m = tag.match(/\bwidth=["'](\d+)["']/i); if (m) w = m[1]; }
+    if (!h) { const m = tag.match(/\bheight=["'](\d+)["']/i); if (m) h = m[1]; }
     const styleMatch = tag.match(/style=["']([^"']*?)["']/i);
     if (styleMatch) {
-      if (!w) {
-        const m = styleMatch[1].match(/(?:^|;)\s*width\s*:\s*(\d+)px/i);
-        if (m) w = m[1];
-      }
-      if (!h) {
-        const m = styleMatch[1].match(/(?:^|;)\s*height\s*:\s*(\d+)px/i);
-        if (m) h = m[1];
-      }
+      if (!w) { const m = styleMatch[1].match(/(?:^|;)\s*width\s*:\s*(\d+)px/i); if (m) w = m[1]; }
+      if (!h) { const m = styleMatch[1].match(/(?:^|;)\s*height\s*:\s*(\d+)px/i); if (m) h = m[1]; }
     }
+    if (!w || !h) { const fnMatch = srcMatch[1].match(/[_\-\/](\d{2,4})[xX×](\d{2,4})[_\-\.\/]/); if (fnMatch) { w = w || fnMatch[1]; h = h || fnMatch[2]; } }
 
-    // 5. WxH in filename
-    if (!w || !h) {
-      const fnMatch = srcMatch[1].match(
-        /[_\-\/](\d{2,4})[xX×](\d{2,4})[_\-\.\/]/
-      );
-      if (fnMatch) {
-        w = w || fnMatch[1];
-        h = h || fnMatch[2];
-      }
-    }
+    const commentMatch = before.match(/<!--\s*IMAGE:\s*([^|>\n]*?)(?:\s*\|[^>]*)?\s*-->\s*$/i);
+    const label = commentMatch ? commentMatch[1].trim() : (altMatch && altMatch[1].trim()) ? altMatch[1].trim() : null;
 
-    // Label from comment or alt
-    const commentMatch = before.match(
-      /<!--\s*IMAGE:\s*([^|>\n]*?)(?:\s*\|[^>]*)?\s*-->\s*$/i
-    );
-    const label = commentMatch
-      ? commentMatch[1].trim()
-      : altMatch && altMatch[1].trim()
-        ? altMatch[1].trim()
-        : null;
-
-    imgs.push({
-      id: imgs.length,
-      originalSrc: srcMatch[1],
-      newSrc: "",
-      alt: altMatch ? altMatch[1] : "",
-      label: label || "Obraz " + (imgs.length + 1),
-      w: w || null,
-      h: h || null,
-      fullTag: tag,
-      type: "img",
-    });
+    imgs.push({ id: imgs.length, originalSrc: srcMatch[1], newSrc: "", alt: altMatch ? altMatch[1] : "", label: label || "Obraz " + (imgs.length + 1), w: w || null, h: h || null, fullTag: tag, type: "img" });
   }
 
   // ── 2. Find background-image in inline styles ──
-  const bgInlineRegex =
-    /style=["'][^"']*?background(?:-image)?\s*:\s*[^;]*?url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
+  const bgInlineRegex = /style=["'][^"']*?background(?:-image)?\s*:\s*[^;]*?url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
   while ((match = bgInlineRegex.exec(html)) !== null) {
     const url = match[1].trim();
     if (url.startsWith("data:") || url.startsWith("#")) continue;
     if (imgs.some((i) => i.originalSrc === url)) continue;
-
     const before = html.substring(Math.max(0, match.index - 300), match.index);
-    const commentMatch = before.match(
-      /<!--\s*IMAGE:\s*([^|>\n]*?)(?:\s*\|[^>]*)?\s*-->\s*$/i
-    );
-
-    imgs.push({
-      id: imgs.length,
-      originalSrc: url,
-      newSrc: "",
-      alt: "",
-      label: commentMatch
-        ? commentMatch[1].trim()
-        : "Tło " + (imgs.length + 1),
-      w: null,
-      h: null,
-      fullTag: match[0],
-      type: "bg",
-    });
+    const commentMatch = before.match(/<!--\s*IMAGE:\s*([^|>\n]*?)(?:\s*\|[^>]*)?\s*-->\s*$/i);
+    imgs.push({ id: imgs.length, originalSrc: url, newSrc: "", alt: "", label: commentMatch ? commentMatch[1].trim() : "Tło " + (imgs.length + 1), w: null, h: null, fullTag: match[0], type: "bg" });
   }
 
   // ── 3. Find background-image in <style> blocks ──
@@ -282,29 +191,169 @@ function parseImagesFromHtml(html) {
   let styleBlockMatch;
   while ((styleBlockMatch = styleBlockRegex.exec(html)) !== null) {
     const cssContent = styleBlockMatch[1];
-    const cssBgRegex =
-      /background(?:-image)?\s*:\s*[^;]*?url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
+    const cssBgRegex = /background(?:-image)?\s*:\s*[^;]*?url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
     let cssBgMatch;
     while ((cssBgMatch = cssBgRegex.exec(cssContent)) !== null) {
       const url = cssBgMatch[1].trim();
       if (url.startsWith("data:") || url.startsWith("#")) continue;
       if (imgs.some((i) => i.originalSrc === url)) continue;
-
-      imgs.push({
-        id: imgs.length,
-        originalSrc: url,
-        newSrc: "",
-        alt: "",
-        label: "CSS tło " + (imgs.length + 1),
-        w: null,
-        h: null,
-        fullTag: cssBgMatch[0],
-        type: "css-bg",
-      });
+      imgs.push({ id: imgs.length, originalSrc: url, newSrc: "", alt: "", label: "CSS tło " + (imgs.length + 1), w: null, h: null, fullTag: cssBgMatch[0], type: "css-bg" });
     }
   }
 
   return imgs;
+}
+
+/* ═══════════════════════════════════════════════
+   PLACEHOLDER DETECTOR — finds spots to ADD images
+   When HTML has no images at all, scan for sections
+   where images would improve the page
+═══════════════════════════════════════════════ */
+const PLACEHOLDER_PRESETS = [
+  { match: /hero|banner|header|jumbotron/i, label: "Hero — tło sekcji", w: "1200", h: "675", inject: "bg", desc: "Główny baner / tło hero" },
+  { match: /about|overview|intro|who-we|o-nas/i, label: "Sekcja „O nas" — zdjęcie", w: "600", h: "400", inject: "img", desc: "Zdjęcie do sekcji informacyjnej" },
+  { match: /feature|benefit|advantage|korzy/i, label: "Ikona / zdjęcie feature", w: "400", h: "400", inject: "img", desc: "Ilustracja do sekcji benefitów" },
+  { match: /testimonial|opini|review|quote/i, label: "Zdjęcie autora opinii", w: "80", h: "80", inject: "img", desc: "Avatar / zdjęcie osoby" },
+  { match: /cta|call-to-action|action|zapisy|contact/i, label: "CTA — tło sekcji", w: "1200", h: "500", inject: "bg", desc: "Tło sekcji z wezwaniem do akcji" },
+  { match: /gallery|galeria|photo|zdj/i, label: "Galeria — zdjęcie", w: "800", h: "600", inject: "img", desc: "Zdjęcie do galerii" },
+  { match: /pricing|cennik|price|pakiet/i, label: "Cennik — dekoracja", w: "600", h: "400", inject: "img", desc: "Zdjęcie do sekcji cenowej" },
+  { match: /timeline|itinerary|harmonogram|plan/i, label: "Timeline — zdjęcie", w: "600", h: "400", inject: "img", desc: "Ilustracja do timeline" },
+];
+
+function detectPlaceholders(html) {
+  const slots = [];
+  let idCounter = 0;
+
+  // Parse HTML with DOMParser to find sections
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  // Find all block elements that could be sections
+  const sectionEls = doc.querySelectorAll("section, div, header, footer, main, article");
+  const processed = new Set();
+
+  sectionEls.forEach((el) => {
+    // Skip tiny elements / deeply nested
+    if (el.textContent.trim().length < 10) return;
+    // Check class/id for section type
+    const identifier = (el.className || "") + " " + (el.id || "");
+    if (!identifier.trim()) return;
+    if (processed.has(identifier)) return;
+    processed.add(identifier);
+
+    // Check if this element already has an image inside
+    if (el.querySelector("img") || (el.getAttribute("style") || "").includes("url(")) return;
+
+    for (const preset of PLACEHOLDER_PRESETS) {
+      if (preset.match.test(identifier)) {
+        // Get section heading for a better label
+        const heading = el.querySelector("h1,h2,h3");
+        const headingText = heading ? heading.textContent.trim().substring(0, 40) : "";
+
+        slots.push({
+          id: idCounter++,
+          label: headingText ? `${preset.label} — „${headingText}"` : preset.label,
+          desc: preset.desc,
+          w: preset.w,
+          h: preset.h,
+          inject: preset.inject,
+          newSrc: "",
+          // Store a CSS selector to find this element later
+          selector: el.id ? `#${el.id}` : el.className ? `.${el.className.split(/\s+/)[0]}` : null,
+          className: el.className || "",
+          tagName: el.tagName.toLowerCase(),
+        });
+        break; // one preset per element
+      }
+    }
+  });
+
+  // If we still found nothing, add generic hero + CTA slots
+  if (slots.length === 0) {
+    // Check if there's any div/section with a gradient background (common in AI-generated pages)
+    const allEls = doc.querySelectorAll("*");
+    let heroFound = false;
+    allEls.forEach((el) => {
+      const style = el.getAttribute("style") || "";
+      const cls = (el.className || "") + " " + (el.id || "");
+      if (!heroFound && (style.includes("gradient") || style.includes("min-height") || cls.match(/hero|banner/i))) {
+        const heading = el.querySelector("h1,h2");
+        const headingText = heading ? heading.textContent.trim().substring(0, 40) : "Hero";
+        slots.push({
+          id: idCounter++,
+          label: `Hero tło — „${headingText}"`,
+          desc: "Główny baner strony",
+          w: "1200", h: "675",
+          inject: "bg",
+          newSrc: "",
+          selector: el.id ? `#${el.id}` : el.className ? `.${el.className.split(/\s+/)[0]}` : null,
+          className: el.className || "",
+          tagName: el.tagName.toLowerCase(),
+        });
+        heroFound = true;
+      }
+    });
+
+    // Always offer a generic "dodaj zdjęcie" slot
+    slots.push({
+      id: idCounter++,
+      label: "Dodaj zdjęcie do strony",
+      desc: "Wklej URL — dodamy <img> na górze sekcji body",
+      w: "1200", h: "675",
+      inject: "img-generic",
+      newSrc: "",
+      selector: null,
+      className: "",
+      tagName: "body",
+    });
+  }
+
+  return slots;
+}
+
+function applyPlaceholders(html, slots) {
+  let updated = html;
+
+  slots.forEach((slot) => {
+    if (!slot.newSrc.trim()) return;
+    const src = slot.newSrc.trim();
+
+    if (slot.inject === "bg" && slot.selector) {
+      // Add background-image to the element's inline style via regex on class
+      const cls = slot.className.split(/\s+/)[0];
+      if (!cls) return;
+      // Find the element opening tag by class and inject background-image
+      const classRegex = new RegExp(`(class=["'][^"']*\\b${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b[^"']*["'][^>]*)(style=["'])`, "i");
+      const classRegexNoStyle = new RegExp(`(class=["'][^"']*\\b${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b[^"']*["'])`, "i");
+
+      if (classRegex.test(updated)) {
+        // Element already has style — prepend background-image
+        updated = updated.replace(classRegex, `$1$2background-image:url('${src}');background-size:cover;background-position:center;`);
+      } else if (classRegexNoStyle.test(updated)) {
+        // Element has no style — add one
+        updated = updated.replace(classRegexNoStyle, `$1 style="background-image:url('${src}');background-size:cover;background-position:center;"`);
+      }
+    } else if (slot.inject === "img" && slot.selector) {
+      // Insert <img> as first child of the section
+      const cls = slot.className.split(/\s+/)[0];
+      if (!cls) return;
+      const openTagRegex = new RegExp(`(<${slot.tagName}[^>]*class=["'][^"']*\\b${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b[^"']*["'][^>]*>)`, "i");
+      const imgTag = `<img src="${src}" alt="${slot.label}" style="width:100%;height:auto;display:block;border-radius:14px;margin-bottom:20px;">`;
+      updated = updated.replace(openTagRegex, `$1\n${imgTag}`);
+    } else if (slot.inject === "img-generic") {
+      // Insert after opening <body> or after first <style>...</style> block
+      const styleEnd = updated.lastIndexOf("</style>");
+      const imgTag = `\n<img src="${src}" alt="${slot.label}" style="width:100%;height:auto;display:block;border-radius:14px;margin-bottom:20px;">\n`;
+      if (styleEnd > -1) {
+        const insertAt = styleEnd + "</style>".length;
+        updated = updated.substring(0, insertAt) + imgTag + updated.substring(insertAt);
+      } else {
+        updated = imgTag + updated;
+      }
+    }
+  });
+
+  return updated;
 }
 
 function formatDims(w, h) {
@@ -456,10 +505,12 @@ function TabBtn({ active, onClick, children }) {
 }
 
 /* ═══════════════════════════════════════════════
-   IMAGE REPLACER — fixed: handles bg-image, CSS, empty state
+   IMAGE REPLACER — handles existing images + placeholder slots
 ═══════════════════════════════════════════════ */
 function ImageReplacer({ html, onHtmlUpdate }) {
   const [images, setImages] = useState([]);
+  const [placeholders, setPlaceholders] = useState([]);
+  const [mode, setMode] = useState("images"); // "images" | "placeholders"
   const [outputHtml, setOutputHtml] = useState("");
   const [copied, setCopied] = useState(false);
   const [previewDevice, setPreviewDevice] = useState("desktop");
@@ -467,25 +518,39 @@ function ImageReplacer({ html, onHtmlUpdate }) {
 
   useEffect(() => {
     if (html && html.trim()) {
-      setImages(parseImagesFromHtml(html));
+      const foundImages = parseImagesFromHtml(html);
+      setImages(foundImages);
+      if (foundImages.length === 0) {
+        setPlaceholders(detectPlaceholders(html));
+        setMode("placeholders");
+      } else {
+        setPlaceholders([]);
+        setMode("images");
+      }
       setOutputHtml("");
       setParseAttempted(true);
     } else {
       setImages([]);
+      setPlaceholders([]);
       setParseAttempted(false);
     }
   }, [html]);
 
-  const update = (id, newSrc) =>
+  const updateImage = (id, newSrc) =>
     setImages((p) => p.map((img) => (img.id === id ? { ...img, newSrc } : img)));
+
+  const updatePlaceholder = (id, newSrc) =>
+    setPlaceholders((p) => p.map((s) => (s.id === id ? { ...s, newSrc } : s)));
 
   const generate = () => {
     let updated = html;
-    images.forEach((img) => {
-      if (img.newSrc.trim()) {
-        updated = updated.split(img.originalSrc).join(img.newSrc.trim());
-      }
-    });
+    if (mode === "images") {
+      images.forEach((img) => {
+        if (img.newSrc.trim()) updated = updated.split(img.originalSrc).join(img.newSrc.trim());
+      });
+    } else {
+      updated = applyPlaceholders(html, placeholders);
+    }
     setOutputHtml(updated);
     if (onHtmlUpdate) onHtmlUpdate(updated);
   };
@@ -496,338 +561,144 @@ function ImageReplacer({ html, onHtmlUpdate }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const hasChanges = images.some((i) => i.newSrc.trim());
-  const iW =
-    previewDevice === "mobile"
-      ? 390
-      : previewDevice === "tablet"
-        ? 768
-        : "100%";
+  const hasChanges = mode === "images"
+    ? images.some((i) => i.newSrc.trim())
+    : placeholders.some((s) => s.newSrc.trim());
+
+  const iW = previewDevice === "mobile" ? 390 : previewDevice === "tablet" ? 768 : "100%";
 
   // Empty state — no HTML pasted yet
   if (!html || !html.trim()) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "#999" }}>
-        <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>
-          🖼
-        </span>
+        <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🖼</span>
         Wklej HTML po lewej — tutaj pojawią się obrazy do podmiany
       </div>
     );
   }
 
-  // HTML pasted but no images found
-  if (parseAttempted && images.length === 0) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: "#999" }}>
-        <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>
-          🔍
-        </span>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#666", marginBottom: 8 }}>
-          Nie znaleziono obrazów w tym HTML
-        </div>
-        <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6 }}>
-          Parser szuka: tagów <code>&lt;img&gt;</code>, atrybutów{" "}
-          <code>data-src</code>, oraz{" "}
-          <code>background-image: url(...)</code> w stylach inline i blokach{" "}
-          <code>&lt;style&gt;</code>.
-          <br />
-          <br />
-          Upewnij się, że wklejony HTML zawiera elementy graficzne.
-        </div>
-      </div>
-    );
-  }
-
-  const imgCount = images.filter((i) => i.type === "img").length;
-  const bgCount = images.filter(
-    (i) => i.type === "bg" || i.type === "css-bg"
-  ).length;
+  // ── Render image/placeholder list ──
+  const items = mode === "images" ? images : placeholders;
+  const isPlaceholderMode = mode === "placeholders";
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>
-        Znaleziono{" "}
-        <strong style={{ color: "#232323" }}>{images.length}</strong> obrazów
-        {imgCount > 0 && bgCount > 0 && (
-          <span>
-            {" "}
-            ({imgCount} × <code>&lt;img&gt;</code>, {bgCount} × tło CSS)
-          </span>
-        )}
-        . Wklej nowe URLe → kliknij „Generuj HTML z nowymi obrazami".
-      </div>
+      {/* Mode indicator */}
+      {isPlaceholderMode ? (
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 16, padding: "12px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10 }}>
+          <strong style={{ color: "#92400e" }}>Brak obrazów w HTML</strong> — ale znaleziono <strong style={{ color: "#232323" }}>{placeholders.length}</strong> miejsc na zdjęcia.
+          Wklej URLe zdjęć → system wstrzyknie je do odpowiednich sekcji.
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>
+          Znaleziono <strong style={{ color: "#232323" }}>{images.length}</strong> obrazów
+          {images.filter(i => i.type === "img").length > 0 && images.filter(i => i.type !== "img").length > 0 && (
+            <span> ({images.filter(i => i.type === "img").length} × <code>&lt;img&gt;</code>, {images.filter(i => i.type !== "img").length} × tło CSS)</span>
+          )}
+          . Wklej nowe URLe → kliknij „Generuj HTML z nowymi obrazami".
+        </div>
+      )}
 
-      <div
-        style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}
-      >
-        {images.map((img, idx) => {
-          const dims = formatDims(img.w, img.h);
-          const typeBadge =
-            img.type === "bg" || img.type === "css-bg" ? "BG" : "IMG";
-          const typeBadgeColor =
-            img.type === "bg" || img.type === "css-bg" ? "#7c3aed" : "#428BCA";
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+        {items.map((item, idx) => {
+          const isPlaceholder = isPlaceholderMode;
+          const dims = isPlaceholder ? `${item.w}×${item.h}px` : formatDims(item.w, item.h);
+          const typeBadge = isPlaceholder
+            ? (item.inject === "bg" ? "BG" : "IMG")
+            : (item.type === "bg" || item.type === "css-bg" ? "BG" : "IMG");
+          const typeBadgeColor = isPlaceholder
+            ? (item.inject === "bg" ? "#7c3aed" : "#428BCA")
+            : (item.type === "bg" || item.type === "css-bg" ? "#7c3aed" : "#428BCA");
+
           return (
-            <div
-              key={img.id}
-              style={{
-                background: "#fff",
-                border: "1px solid #e8e8e8",
-                borderRadius: 12,
-                padding: 16,
-                display: "flex",
-                gap: 14,
-                alignItems: "flex-start",
-              }}
-            >
-              {/* Thumbnail */}
-              <div
-                style={{
-                  width: 90,
-                  minWidth: 90,
-                  height: 64,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  background: "#f0f0f0",
-                  border: "1px solid #e0e0e0",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <img
-                  src={img.newSrc.trim() || img.originalSrc}
-                  alt={img.alt}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    if (e.target.nextSibling) return;
-                    const span = document.createElement("span");
-                    span.style.fontSize = "22px";
-                    span.textContent = img.type === "img" ? "🖼" : "🎨";
-                    e.target.parentElement.appendChild(span);
-                  }}
-                />
+            <div key={item.id} style={{ background: "#fff", border: "1px solid #e8e8e8", borderRadius: 12, padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
+              {/* Thumbnail / placeholder icon */}
+              <div style={{ width: 90, minWidth: 90, height: 64, borderRadius: 8, overflow: "hidden", background: isPlaceholder ? "#f0f4ff" : "#f0f0f0", border: `1px solid ${isPlaceholder ? "#c7d2fe" : "#e0e0e0"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {isPlaceholder ? (
+                  item.newSrc.trim() ? (
+                    <img src={item.newSrc.trim()} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => { e.target.style.display = "none"; }} />
+                  ) : (
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ fontSize: 20, display: "block" }}>{item.inject === "bg" ? "🎨" : "📸"}</span>
+                      <span style={{ fontSize: 9, color: "#8b5cf6", fontWeight: 600 }}>{dims}</span>
+                    </div>
+                  )
+                ) : (
+                  <img src={item.newSrc.trim() || item.originalSrc} alt={item.alt}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      if (e.target.nextSibling) return;
+                      const span = document.createElement("span");
+                      span.style.fontSize = "22px";
+                      span.textContent = item.type === "img" ? "🖼" : "🎨";
+                      e.target.parentElement.appendChild(span);
+                    }} />
+                )}
               </div>
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 5,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      background: typeBadgeColor,
-                      color: "#fff",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {typeBadge}
-                  </span>
-                  <span
-                    style={{ fontSize: 13, fontWeight: 700, color: "#232323" }}
-                  >
-                    #{idx + 1} {img.label}
-                  </span>
-                  {dims ? (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 5,
-                        background: "#e8f5e9",
-                        color: "#2e7d32",
-                        letterSpacing: 0.3,
-                      }}
-                    >
-                      {dims}
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 5,
-                        background: "#fff3e0",
-                        color: "#e65100",
-                        letterSpacing: 0.3,
-                      }}
-                    >
-                      ⚠️ Brak wymiarów
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 4, background: typeBadgeColor, color: "#fff", letterSpacing: 0.5 }}>{typeBadge}</span>
+                  {isPlaceholder && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "#dbeafe", color: "#1d4ed8" }}>NOWY</span>}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#232323" }}>#{idx + 1} {item.label}</span>
+                  {dims && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: isPlaceholder ? "#ede9fe" : "#e8f5e9", color: isPlaceholder ? "#6d28d9" : "#2e7d32", letterSpacing: 0.3 }}>
+                      {isPlaceholder ? `Sugerowane: ${dims}` : dims}
                     </span>
                   )}
+                  {!dims && !isPlaceholder && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: "#fff3e0", color: "#e65100" }}>⚠️ Brak wymiarów</span>
+                  )}
                 </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#bbb",
-                    marginBottom: 7,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={img.originalSrc}
-                >
-                  Obecny: {img.originalSrc.substring(0, 70)}
-                  {img.originalSrc.length > 70 ? "…" : ""}
-                </div>
-                <input
-                  type="text"
-                  placeholder="Wklej nowy URL obrazu (https://...)…"
-                  value={img.newSrc}
-                  onChange={(e) => update(img.id, e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1.5px solid #e0e0e0",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                    background: img.newSrc.trim() ? "#f0fdf4" : "#fafafa",
-                    transition: "border-color 0.2s",
-                  }}
-                />
+                {isPlaceholder ? (
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 7 }}>{item.desc}</div>
+                ) : (
+                  <div style={{ fontSize: 11, color: "#bbb", marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.originalSrc}>
+                    Obecny: {item.originalSrc.substring(0, 70)}{item.originalSrc.length > 70 ? "…" : ""}
+                  </div>
+                )}
+                <input type="text"
+                  placeholder={isPlaceholder ? "Wklej URL zdjęcia do wstawienia (https://...)…" : "Wklej nowy URL obrazu (https://...)…"}
+                  value={item.newSrc}
+                  onChange={(e) => isPlaceholder ? updatePlaceholder(item.id, e.target.value) : updateImage(item.id, e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${item.newSrc.trim() ? "#86efac" : "#e0e0e0"}`, fontSize: 12, fontFamily: "inherit", background: item.newSrc.trim() ? "#f0fdf4" : "#fafafa", transition: "border-color 0.2s" }} />
               </div>
             </div>
           );
         })}
       </div>
 
-      <button
-        onClick={generate}
-        disabled={!hasChanges}
-        style={{
-          width: "100%",
-          padding: "14px",
-          borderRadius: 10,
-          border: "none",
-          background: hasChanges ? "#232323" : "#e0e0e0",
-          color: hasChanges ? "#FCD23A" : "#999",
-          fontSize: 14,
-          fontWeight: 800,
-          cursor: hasChanges ? "pointer" : "not-allowed",
-          fontFamily: "inherit",
-          marginBottom: 16,
-        }}
-      >
-        🔄 Generuj HTML z nowymi obrazami
+      <button onClick={generate} disabled={!hasChanges}
+        style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: hasChanges ? "#232323" : "#e0e0e0", color: hasChanges ? "#FCD23A" : "#999", fontSize: 14, fontWeight: 800, cursor: hasChanges ? "pointer" : "not-allowed", fontFamily: "inherit", marginBottom: 16 }}>
+        {isPlaceholderMode ? "➕ Wstaw zdjęcia do HTML" : "🔄 Generuj HTML z nowymi obrazami"}
       </button>
 
       {outputHtml && (
         <div style={{ borderTop: "1px solid #e8e8e8", paddingTop: 20 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 12,
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Wynik</span>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 2,
-                  background: "#f0f0f0",
-                  borderRadius: 8,
-                  padding: 3,
-                }}
-              >
-                {[
-                  ["desktop", "🖥"],
-                  ["tablet", "⬜"],
-                  ["mobile", "📱"],
-                ].map(([d, ic]) => (
-                  <button
-                    key={d}
-                    onClick={() => setPreviewDevice(d)}
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 5,
-                      border: "none",
-                      fontSize: 12,
-                      background: previewDevice === d ? "#fff" : "transparent",
-                      cursor: "pointer",
-                      boxShadow:
-                        previewDevice === d
-                          ? "0 1px 3px rgba(0,0,0,0.1)"
-                          : "none",
-                    }}
-                  >
-                    {ic}
-                  </button>
+              <div style={{ display: "flex", gap: 2, background: "#f0f0f0", borderRadius: 8, padding: 3 }}>
+                {[["desktop", "🖥"], ["tablet", "⬜"], ["mobile", "📱"]].map(([d, ic]) => (
+                  <button key={d} onClick={() => setPreviewDevice(d)}
+                    style={{ padding: "4px 8px", borderRadius: 5, border: "none", fontSize: 12, background: previewDevice === d ? "#fff" : "transparent", cursor: "pointer", boxShadow: previewDevice === d ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>{ic}</button>
                 ))}
               </div>
-              <button
-                onClick={copy}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "1.5px solid #e0e0e0",
-                  background: "#fff",
-                  color: "#232323",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
+              <button onClick={copy}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid #e0e0e0", background: "#fff", color: "#232323", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 {copied ? "✓ Skopiowano!" : "📋 Kopiuj HTML"}
               </button>
             </div>
           </div>
-          <div
-            style={{
-              width: iW,
-              maxWidth: "100%",
-              margin: "0 auto",
-              background: "#fff",
-              borderRadius: 10,
-              border: "1px solid #e0e0e0",
-              overflow: "hidden",
-              transition: "width 0.3s ease",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                padding: "8px 12px",
-                background: "#fafafa",
-                borderBottom: "1px solid #eee",
-              }}
-            >
+          <div style={{ width: iW, maxWidth: "100%", margin: "0 auto", background: "#fff", borderRadius: 10, border: "1px solid #e0e0e0", overflow: "hidden", transition: "width 0.3s ease" }}>
+            <div style={{ display: "flex", gap: 6, padding: "8px 12px", background: "#fafafa", borderBottom: "1px solid #eee" }}>
               {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
-                <span
-                  key={c}
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: c,
-                  }}
-                />
+                <span key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />
               ))}
             </div>
-            <iframe
-              srcDoc={outputHtml}
-              title="Preview"
-              style={{ width: "100%", border: "none", minHeight: 500 }}
-              sandbox="allow-scripts allow-same-origin"
-            />
+            <iframe srcDoc={outputHtml} title="Preview" style={{ width: "100%", border: "none", minHeight: 500 }} sandbox="allow-scripts allow-same-origin" />
           </div>
         </div>
       )}
